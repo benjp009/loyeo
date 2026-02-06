@@ -1,0 +1,3 @@
+-- Loyeo seed data
+-- This file will be populated in TS-005 (database schema implementation)
+-- with sample merchant, program, and consumer data for development.
