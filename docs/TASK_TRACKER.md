@@ -8,7 +8,7 @@
 
 | ID | Task | Priority | Status | Notes |
 |----|------|----------|--------|-------|
-| TS-002 | Setup Supabase project | Critical | TO DO | Create project, configure phone OTP auth, deploy schema v1, RLS policies. Free tier sufficient for MVP. |
+| TS-002 | Setup Supabase project | Critical | DONE ✅ | Supabase project created (EU West), phone OTP + email auth enabled, client utilities + middleware configured. Schema deferred to TS-005. |
 | TS-003 | Setup Vercel deployment | High | TO DO | Connect GitHub, configure domains, env vars, preview deploys on PR. Depends on TS-001 + BR-001 (domain). |
 | TS-004 | Setup WhatsApp Business API + SMS fallback | High | TO DO | WhatsApp Business API primary. SMS fallback for OTP only. Depends on TS-002. |
 | TS-005 | Design & implement database schema | Critical | TO DO | Full schema (see ARCHITECTURE.md). Indexes, RLS policies. Depends on TS-002. |
@@ -69,6 +69,7 @@
 - [LG-003] Apple Developer Program enrollment ✅
 - [LG-004] Google Wallet API access setup ✅
 - [TS-001] Setup GitHub repo & project structure ✅
+- [TS-002] Setup Supabase project (auth, client utilities, middleware) ✅
 
 ---
 

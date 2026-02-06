@@ -6,3 +6,6 @@ export type PlanTier = 'free' | 'starter' | 'pro'
 
 /** Program types */
 export type ProgramType = 'stamps' | 'points'
+
+/** User roles for auth routing */
+export type UserRole = 'merchant' | 'consumer'
