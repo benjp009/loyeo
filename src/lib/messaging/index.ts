@@ -32,7 +32,14 @@ export function getMessagingProvider(): MessagingProvider {
       return getTwilioProvider()
 
     case 'mock':
-      // For testing - returns a mock provider that logs but doesn't send
+      // Mock provider only allowed in non-production environments
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'Mock messaging provider is not allowed in production. ' +
+            'Check MESSAGING_PROVIDER environment variable.'
+        )
+      }
+      console.warn('[WARN] Using mock messaging provider - no messages will be sent')
       return getMockProvider()
 
     default:

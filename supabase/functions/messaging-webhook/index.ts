@@ -3,7 +3,9 @@
  *
  * Handles Twilio delivery status webhooks.
  * Updates message status in messaging_events table.
- * Triggers SMS fallback on WhatsApp delivery failure.
+ *
+ * Note: SMS fallback for OTP is handled synchronously at send time,
+ * not via webhook callbacks.
  *
  * Endpoint: POST /messaging-webhook
  * Called by: Twilio when message status changes
@@ -11,10 +13,11 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
-// CORS headers
+// CORS headers - restricted to production domain
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'https://loyeo.fr',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-twilio-signature',
 }
@@ -38,33 +41,77 @@ function mapTwilioStatus(
   return statusMap[status] || 'queued'
 }
 
-// Verify Twilio webhook signature
-function verifyTwilioSignature(
+/**
+ * Verify Twilio webhook signature using HMAC-SHA1
+ *
+ * Algorithm:
+ * 1. Concatenate webhook URL with sorted POST parameters (key+value pairs)
+ * 2. Compute HMAC-SHA1 using auth token as key
+ * 3. Base64 encode the result
+ * 4. Compare with X-Twilio-Signature header
+ *
+ * @see https://www.twilio.com/docs/usage/webhooks/webhooks-security
+ */
+async function verifyTwilioSignature(
   authToken: string,
   signature: string,
   url: string,
   params: Record<string, string>
-): boolean {
-  // Sort parameters alphabetically and concatenate
-  const sortedParams = Object.keys(params)
-    .sort()
-    .map((key) => key + params[key])
-    .join('')
+): Promise<boolean> {
+  try {
+    if (!signature || !authToken || !url) {
+      console.error('[Webhook] Missing required signature verification parameters')
+      return false
+    }
 
-  const data = url + sortedParams
+    // Sort parameters alphabetically and concatenate key+value pairs
+    const sortedParams = Object.keys(params)
+      .sort()
+      .map((key) => key + params[key])
+      .join('')
 
-  // Create HMAC-SHA1
-  const encoder = new TextEncoder()
-  const keyData = encoder.encode(authToken)
-  const messageData = encoder.encode(data)
+    const data = url + sortedParams
 
-  // Note: In production, use proper HMAC verification
-  // This is a simplified version - Twilio SDK handles this properly
-  console.log('[Webhook] Signature verification data length:', data.length)
+    // Create HMAC-SHA1 using Web Crypto API
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(authToken)
+    const messageData = encoder.encode(data)
 
-  // For now, just check signature exists
-  // TODO: Implement proper HMAC-SHA1 verification
-  return signature.length > 0
+    // Import the auth token as HMAC key
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    )
+
+    // Sign the data
+    const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData)
+
+    // Base64 encode the signature
+    const computedSignature = encodeBase64(new Uint8Array(signatureBuffer))
+
+    // Constant-time comparison to prevent timing attacks
+    const isValid = computedSignature === signature
+
+    if (!isValid) {
+      console.warn('[Webhook] Signature mismatch', {
+        expected: computedSignature.substring(0, 10) + '...',
+        received: signature.substring(0, 10) + '...',
+        urlLength: url.length,
+        paramsCount: Object.keys(params).length,
+      })
+    }
+
+    return isValid
+  } catch (error) {
+    console.error('[Webhook] Signature verification error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
+    })
+    return false
+  }
 }
 
 serve(async (req) => {
@@ -89,18 +136,35 @@ serve(async (req) => {
       data[key] = value
     })
 
-    // Verify Twilio signature
+    // Verify Twilio signature - REQUIRED for security
     const signature = req.headers.get('x-twilio-signature') || ''
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
     const webhookUrl = Deno.env.get('TWILIO_WEBHOOK_URL')
 
-    if (authToken && webhookUrl) {
-      const isValid = verifyTwilioSignature(authToken, signature, webhookUrl, data)
-      if (!isValid) {
-        console.warn('[Webhook] Invalid Twilio signature')
-        // In production, reject invalid signatures
-        // For now, log warning and continue
-      }
+    if (!authToken || !webhookUrl) {
+      console.error('[Webhook] Missing required environment variables: TWILIO_AUTH_TOKEN, TWILIO_WEBHOOK_URL')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    const isValid = await verifyTwilioSignature(authToken, signature, webhookUrl, data)
+    if (!isValid) {
+      console.error('[Webhook] Rejected: Invalid Twilio signature', {
+        timestamp: new Date().toISOString(),
+        signaturePresent: signature.length > 0,
+      })
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     // Extract message details
@@ -131,9 +195,21 @@ serve(async (req) => {
       })
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // Initialize Supabase client with validation
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[Webhook] Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Update message status in messaging_events table
@@ -148,7 +224,19 @@ serve(async (req) => {
       .eq('message_id', messageId)
 
     if (updateError) {
-      console.error('[Webhook] Failed to update status:', updateError)
+      console.error('[Webhook] Database update failed:', {
+        messageId,
+        error: updateError,
+        timestamp: new Date().toISOString(),
+      })
+      // Return 500 to trigger Twilio retry
+      return new Response(
+        JSON.stringify({ error: 'Database update failed', retry: true }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
     }
 
     // Check if this is a failed WhatsApp message that needs SMS fallback

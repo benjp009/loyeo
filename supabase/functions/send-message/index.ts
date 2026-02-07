@@ -14,9 +14,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// CORS headers for browser requests
+// CORS headers - restricted to production domain
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || 'https://loyeo.fr',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
 }
@@ -114,7 +114,7 @@ async function sendOTP(request: OTPRequest): Promise<SendResult> {
           body: new URLSearchParams({
             From: whatsAppNumber,
             To: `whatsapp:${phone}`,
-            Body: `Votre code Loyeo: ${request.code}`,
+            Body: `Votre code de vérification Loyeo : ${request.code}`,
           }),
         }
       )
@@ -132,10 +132,16 @@ async function sendOTP(request: OTPRequest): Promise<SendResult> {
       }
 
       // Check if we should fall back to SMS
+      // Only fall back for specific WhatsApp-unavailable errors
       const fallbackErrors = [63001, 63003, 63016, 63024]
       if (fallbackErrors.includes(data.code)) {
-        console.log(`WhatsApp failed for ${phone}, falling back to SMS`)
+        console.log('[send-message] WhatsApp failed for user, falling back to SMS', {
+          errorCode: data.code,
+          phone: phone.substring(0, 6) + '***',
+          timestamp: new Date().toISOString(),
+        })
       } else {
+        // Non-fallback errors should propagate, not silently fall back
         return {
           success: false,
           messageId: null,
@@ -145,7 +151,29 @@ async function sendOTP(request: OTPRequest): Promise<SendResult> {
         }
       }
     } catch (error) {
-      console.error('WhatsApp error:', error)
+      // Only fall back for network errors, not auth/config errors
+      console.error('[send-message] WhatsApp network error:', {
+        error: error instanceof Error ? error.message : 'Unknown',
+        phone: phone.substring(0, 6) + '***',
+        timestamp: new Date().toISOString(),
+      })
+      // For network errors, we can attempt SMS fallback
+      // For other errors (like TypeError), propagate them
+      if (!(error instanceof TypeError)) {
+        // Network error - continue to SMS fallback
+      } else {
+        // Programming error - propagate
+        return {
+          success: false,
+          messageId: null,
+          channel: 'whatsapp',
+          status: 'failed',
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          },
+        }
+      }
     }
   }
 
@@ -162,7 +190,7 @@ async function sendOTP(request: OTPRequest): Promise<SendResult> {
         body: new URLSearchParams({
           From: phoneNumber,
           To: phone,
-          Body: `Votre code Loyeo: ${request.code}`,
+          Body: `Votre code de vérification Loyeo : ${request.code}`,
         }),
       }
     )
@@ -241,11 +269,14 @@ async function sendTemplate(request: TemplateRequest): Promise<SendResult> {
   // For session messages, send direct body
   if (request.isSessionMessage) {
     const templates: Record<string, string> = {
-      visit_confirmation: `Tampon enregistre! ${request.variables['1'] || ''}/${request.variables['2'] || ''} tampons`,
-      reward_redeemed: `Recompense utilisee: ${request.variables['1'] || ''}`,
+      visit_confirmation: `Tampon enregistré ! ${request.variables['1'] || ''}/${request.variables['2'] || ''} tampons`,
+      reward_redeemed: `Récompense utilisée : ${request.variables['1'] || ''}`,
     }
 
-    const body = templates[request.template] || ''
+    const body = templates[request.template]
+    if (!body) {
+      console.warn('[send-message] Unknown session template requested:', request.template)
+    }
 
     const auth = btoa(`${accountSid}:${authToken}`)
     const response = await fetch(
@@ -407,14 +438,15 @@ async function sendSMS(request: SMSRequest): Promise<SendResult> {
 }
 
 // Log message event to database
+// Returns logging status - non-fatal but tracked
 async function logMessageEvent(
   supabase: ReturnType<typeof createClient>,
   result: SendResult,
   messageType: MessageType,
   phone: string
-) {
+): Promise<{ logged: boolean; error?: string }> {
   try {
-    await supabase.from('messaging_events').insert({
+    const { error } = await supabase.from('messaging_events').insert({
       message_id: result.messageId,
       message_type: messageType,
       channel: result.channel,
@@ -424,8 +456,24 @@ async function logMessageEvent(
       error_code: result.error?.code,
       error_message: result.error?.message,
     })
+
+    if (error) {
+      console.error('[send-message] Failed to log message event:', {
+        messageId: result.messageId,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      })
+      return { logged: false, error: error.message }
+    }
+
+    return { logged: true }
   } catch (error) {
-    console.error('Failed to log message event:', error)
+    console.error('[send-message] Exception logging message event:', {
+      messageId: result.messageId,
+      error: error instanceof Error ? error.message : 'Unknown',
+      timestamp: new Date().toISOString(),
+    })
+    return { logged: false, error: String(error) }
   }
 }
 
@@ -457,9 +505,21 @@ serve(async (req) => {
 
     const body = await req.json()
 
-    // Initialize Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // Initialize Supabase client with validation
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[send-message] Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     let result: SendResult
@@ -495,8 +555,11 @@ serve(async (req) => {
         )
     }
 
-    // Log to messaging_events table
-    await logMessageEvent(supabase, result, messageType, phone)
+    // Log to messaging_events table (non-fatal, but tracked)
+    const logResult = await logMessageEvent(supabase, result, messageType, phone)
+    if (!logResult.logged) {
+      console.warn('[send-message] Message sent but logging failed:', logResult.error)
+    }
 
     return new Response(JSON.stringify(result), {
       status: result.success ? 200 : 400,

@@ -396,7 +396,12 @@ export class TwilioProvider implements MessagingProvider {
         webhookUrl,
         data
       )
-    } catch {
+    } catch (error) {
+      console.error('[Twilio] Webhook signature verification failed:', {
+        error: error instanceof Error ? error.message : 'Unknown',
+        payloadLength: payload.length,
+        timestamp: new Date().toISOString(),
+      })
       return false
     }
   }
@@ -409,15 +414,19 @@ export class TwilioProvider implements MessagingProvider {
     variables: Record<string, string>
   ): string {
     const templates: Record<WhatsAppTemplate, string> = {
-      otp_verification: `Votre code Loyeo: ${variables['1'] || ''}`,
-      welcome: `Bienvenue chez ${variables['1'] || ''}! Vous avez gagne votre premier tampon.`,
-      visit_confirmation: `Tampon enregistre! ${variables['1'] || ''}/${variables['2'] || ''} tampons`,
-      reward_earned: `Bravo! Vous avez gagne: ${variables['1'] || ''}`,
-      reward_redeemed: `Recompense utilisee: ${variables['1'] || ''}`,
+      otp_verification: `Votre code de vérification Loyeo: ${variables['1'] || ''}`,
+      welcome: `Bienvenue chez ${variables['1'] || ''} ! Vous avez gagné votre premier tampon.`,
+      visit_confirmation: `Tampon enregistré ! ${variables['1'] || ''}/${variables['2'] || ''} tampons`,
+      reward_earned: `Bravo ! Vous avez gagné : ${variables['1'] || ''}`,
+      reward_redeemed: `Récompense utilisée : ${variables['1'] || ''}`,
       marketing: variables['1'] || '',
     }
 
-    return templates[template] || ''
+    const rendered = templates[template]
+    if (!rendered && template !== 'marketing') {
+      console.error('[Twilio] Unknown template requested:', template)
+    }
+    return rendered || ''
   }
 
   /**
