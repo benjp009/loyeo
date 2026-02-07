@@ -8,7 +8,7 @@
 | Backend | Supabase (Auth, PostgreSQL, Storage, Edge Functions) | BaaS — no separate backend server |
 | Hosting | Vercel | Deployment (cdg1 region), preview deploys on PR, loyeo.fr domain |
 | Payments | Stripe | Subscription billing (€29/€49 monthly, 3-month cycles) |
-| Messaging | WhatsApp Business API (primary) + SMS fallback (OTP only) | OTP verification, notifications, marketing |
+| Messaging | Twilio (WhatsApp Business API + SMS) | OTP verification, notifications, marketing. See [MESSAGING.md](MESSAGING.md) |
 | Wallet | Apple PassKit + Google Wallet API | Loyalty card passes |
 | Maps | Leaflet + OpenStreetMap | Consumer portal nearby merchants |
 | Analytics | Plausible or Umami | RGPD-compliant, cookie-free |
@@ -108,18 +108,48 @@ All tables must have RLS enabled. Key rules:
 - **Edge Functions** use service role key for operations that cross merchant/consumer boundaries (e.g. recording a visit).
 - **Public access** to merchant public pages (slug-based lookup) — read-only on merchant name, logo, program info.
 
-## WhatsApp Message Templates & Costs
+## Messaging Infrastructure (TS-004)
 
-| Template | Category | Cost per message |
-|----------|----------|-----------------|
-| OTP verification | Authentication | €0.04 (SMS fallback: €0.05) |
-| Welcome message | Utility | €0.04 |
-| Visit confirmation | Session (within 24h) | FREE |
-| Reward earned | Utility | €0.04 |
-| Reward redeemed | Session | FREE |
-| Marketing (inactive, birthday, promo) | Marketing | €0.07 |
+**Provider:** Twilio (WhatsApp Business API + Programmable SMS)
+**Decision:** Council debate 2026-02-07 — unified provider over fragmented stack
+**Constraints:** Pay-as-you-go only, no long-term contracts
 
-**Typical consumer lifecycle cost:** ~€0.12 to first reward (vs €0.20+ with SMS only)
+### Architecture
+
+```
+src/lib/messaging/
+├── types.ts              # Provider interface, templates, costs
+├── index.ts              # Provider factory (env-based selection)
+└── providers/
+    └── twilio.ts         # Twilio implementation
+
+supabase/functions/
+├── send-message/         # Edge function for sending messages
+└── messaging-webhook/    # Delivery status webhook handler
+```
+
+### Message Templates & Costs
+
+| Template | Category | Cost |
+|----------|----------|------|
+| `otp_verification` | Authentication | €0.04 |
+| `welcome` | Utility | €0.04 |
+| `visit_confirmation` | Session (within 24h) | FREE |
+| `reward_earned` | Utility | €0.04 |
+| `reward_redeemed` | Session | FREE |
+| `marketing` | Marketing | €0.07 |
+| SMS fallback | — | €0.05 |
+
+**Typical consumer lifecycle cost:** ~€0.12 to first reward
+
+### Cost Monitoring
+
+- Table: `messaging_events` (tracks all messages)
+- Views: `messaging_cost_daily`, `messaging_cost_monthly`
+- Alerts: €50/month (warning), €100/month (alert), €200/month (critical)
+- Migration threshold: Revisit at 25+ merchants or €500/month
+
+See [MESSAGING.md](MESSAGING.md) for full documentation.
 
 ## URL Structure
 
@@ -154,6 +184,7 @@ loyeo/
 │   ├── styles/              # Global styles, Tailwind config
 │   └── types/               # TypeScript types
 ├── supabase/
+│   ├── functions/           # Edge Functions (send-message, messaging-webhook)
 │   ├── migrations/          # SQL migrations
 │   └── seed.sql             # Seed data
 ├── public/                  # Static assets, logos

@@ -10,8 +10,8 @@
 |----|------|----------|--------|-------|
 | TS-002 | Setup Supabase project | Critical | DONE ✅ | Supabase project created (EU West), phone OTP + email auth enabled, client utilities + middleware configured. Schema deferred to TS-005. |
 | TS-003 | Setup Vercel deployment | High | DONE ✅ | Vercel connected to GitHub, cdg1 region (Paris), loyeo.fr domain configured, preview deploys enabled. See docs/DEPLOYMENT.md. |
-| TS-004 | Setup WhatsApp Business API + SMS fallback | High | TO DO | WhatsApp Business API primary. SMS fallback for OTP only. Depends on TS-002. |
-| TS-005 | Design & implement database schema | Critical | TO DO | Full schema (see ARCHITECTURE.md). Indexes, RLS policies. Depends on TS-002. |
+| TS-004 | Setup WhatsApp Business API + SMS fallback | High | DONE ✅ | Twilio provider (Council decision). Abstraction layer, Edge Functions, cost monitoring. Pending: Twilio account + Meta verification. See docs/MESSAGING.md. |
+| TS-005 | Design & implement database schema | Critical | DONE ✅ | 6 core tables (merchants, programs, consumers, enrollments, visits, redemptions), 13 indexes, full RLS policies, TypeScript types. Migration ready: `supabase/migrations/20260207120000_create_core_schema.sql`. Apply with `supabase db push`. |
 | BR-004 | Design merchant-facing pitch deck | Medium | TO DO | For sales outreach in Phase 3. |
 | — | REF: Database Schema & Tech Stack Reference | Low | TO DO | Reference task in ClickUp with schema details. |
 
@@ -70,6 +70,8 @@
 - [TS-001] Setup GitHub repo & project structure ✅
 - [TS-002] Setup Supabase project (auth, client utilities, middleware) ✅
 - [TS-003] Setup Vercel deployment (cdg1 region, loyeo.fr, preview deploys) ✅
+- [TS-004] Setup WhatsApp Business API + SMS fallback (Twilio, abstraction layer, Edge Functions) ✅
+- [TS-005] Design & implement database schema (6 core tables, RLS, indexes, TypeScript types) ✅
 
 ---
 
