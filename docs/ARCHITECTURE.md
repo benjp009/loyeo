@@ -6,7 +6,7 @@
 |-------|-----------|---------|
 | Frontend | Next.js 14, Tailwind CSS, shadcn/ui | Web app (merchant dashboard, consumer pages, landing page) |
 | Backend | Supabase (Auth, PostgreSQL, Storage, Edge Functions) | BaaS — no separate backend server |
-| Hosting | Vercel | Deployment, preview deploys on PR, custom domain |
+| Hosting | Vercel | Deployment (cdg1 region), preview deploys on PR, loyeo.fr domain |
 | Payments | Stripe | Subscription billing (€29/€49 monthly, 3-month cycles) |
 | Messaging | WhatsApp Business API (primary) + SMS fallback (OTP only) | OTP verification, notifications, marketing |
 | Wallet | Apple PassKit + Google Wallet API | Loyalty card passes |
@@ -123,11 +123,11 @@ All tables must have RLS enabled. Key rules:
 
 ## URL Structure
 
-- `loyeo.com` — Landing page (marketing site)
-- `loyeo.com/{merchant-slug}` — Merchant public page (QR landing)
-- `loyeo.com/dashboard` — Merchant dashboard (authenticated)
-- `loyeo.com/my` — Consumer portal (authenticated)
-- `loyeo.com/api/*` — Next.js API routes
+- `loyeo.fr` — Landing page (marketing site)
+- `loyeo.fr/{merchant-slug}` — Merchant public page (QR landing)
+- `loyeo.fr/dashboard` — Merchant dashboard (authenticated)
+- `loyeo.fr/my` — Consumer portal (authenticated)
+- `loyeo.fr/api/*` — Next.js API routes
 
 ## Project Structure (Monorepo)
 
