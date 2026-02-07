@@ -9,11 +9,10 @@
 | ID | Task | Priority | Status | Notes |
 |----|------|----------|--------|-------|
 | TS-002 | Setup Supabase project | Critical | DONE ✅ | Supabase project created (EU West), phone OTP + email auth enabled, client utilities + middleware configured. Schema deferred to TS-005. |
-| TS-003 | Setup Vercel deployment | High | TO DO | Connect GitHub, configure domains, env vars, preview deploys on PR. Depends on TS-001 + BR-001 (domain). |
+| TS-003 | Setup Vercel deployment | High | DONE ✅ | Vercel connected to GitHub, cdg1 region (Paris), loyeo.fr domain configured, preview deploys enabled. See docs/DEPLOYMENT.md. |
 | TS-004 | Setup WhatsApp Business API + SMS fallback | High | TO DO | WhatsApp Business API primary. SMS fallback for OTP only. Depends on TS-002. |
 | TS-005 | Design & implement database schema | Critical | TO DO | Full schema (see ARCHITECTURE.md). Indexes, RLS policies. Depends on TS-002. |
 | BR-004 | Design merchant-facing pitch deck | Medium | TO DO | For sales outreach in Phase 3. |
-| — | Loyeo.com domain expired | Blocker | TO DO | Domain needs renewal or re-purchase. |
 | — | REF: Database Schema & Tech Stack Reference | Low | TO DO | Reference task in ClickUp with schema details. |
 
 ## ⬜ Next Up — Phase 1 Tasks (Weeks 3-6)
@@ -61,7 +60,7 @@
 
 ## ✅ Completed (Phase 0)
 
-- [BR-001] Define brand name & domain ✅
+- [BR-001] Define brand name & domain (loyeo.fr) ✅
 - [BR-002] Design logo & visual identity ✅
 - [BR-003] Create brand guidelines document ✅
 - [LG-001] Register company / update UGITECH scope ✅
@@ -70,6 +69,7 @@
 - [LG-004] Google Wallet API access setup ✅
 - [TS-001] Setup GitHub repo & project structure ✅
 - [TS-002] Setup Supabase project (auth, client utilities, middleware) ✅
+- [TS-003] Setup Vercel deployment (cdg1 region, loyeo.fr, preview deploys) ✅
 
 ---
 
