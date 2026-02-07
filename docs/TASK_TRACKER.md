@@ -9,7 +9,7 @@
 | ID | Task | Priority | Status | Notes |
 |----|------|----------|--------|-------|
 | TS-002 | Setup Supabase project | Critical | DONE ✅ | Supabase project created (EU West), phone OTP + email auth enabled, client utilities + middleware configured. Schema deferred to TS-005. |
-| TS-003 | Setup Vercel deployment | High | DONE ✅ | Vercel connected to GitHub, cdg1 region (Paris), loyeo.fr domain configured, preview deploys enabled. See docs/DEPLOYMENT.md. |
+| TS-003 | Setup Vercel deployment | High | DONE ✅ | Vercel connected to GitHub, cdg1 region (Paris), loyeo.fr domain configured, preview deploys enabled. See docs/DEPLOYMENT.md. | Domain linked
 | TS-004 | Setup WhatsApp Business API + SMS fallback | High | TO DO | WhatsApp Business API primary. SMS fallback for OTP only. Depends on TS-002. |
 | TS-005 | Design & implement database schema | Critical | TO DO | Full schema (see ARCHITECTURE.md). Indexes, RLS policies. Depends on TS-002. |
 | BR-004 | Design merchant-facing pitch deck | Medium | TO DO | For sales outreach in Phase 3. |
