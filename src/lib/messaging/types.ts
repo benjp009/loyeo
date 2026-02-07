@@ -17,22 +17,46 @@ export type MessageStatus =
   | 'failed'
   | 'undelivered'
 
+// Success vs failure status for type narrowing
+export type SuccessStatus = 'queued' | 'sent' | 'delivered' | 'read'
+export type FailureStatus = 'failed' | 'undelivered'
+
 // Message channel
 export type MessageChannel = 'whatsapp' | 'sms'
 
-// Result of a send operation
-export interface SendResult {
-  success: boolean
-  messageId: string | null
-  channel: MessageChannel
-  status: MessageStatus
-  error?: {
-    code: string
-    message: string
-  }
-  // Cost in EUR cents for monitoring
-  estimatedCostCents?: number
-}
+// Branded type for E.164 phone numbers
+declare const E164PhoneBrand: unique symbol
+export type E164PhoneNumber = string & { readonly [E164PhoneBrand]: true }
+
+/**
+ * Result of a send operation - discriminated union
+ *
+ * When success is true:
+ * - messageId is guaranteed to be a string
+ * - estimatedCostCents is guaranteed to be a number
+ *
+ * When success is false:
+ * - error is guaranteed to be present
+ * - messageId is null
+ */
+export type SendResult =
+  | {
+      success: true
+      messageId: string
+      channel: MessageChannel
+      status: SuccessStatus
+      estimatedCostCents: number
+    }
+  | {
+      success: false
+      messageId: null
+      channel: MessageChannel
+      status: FailureStatus
+      error: {
+        code: string
+        message: string
+      }
+    }
 
 // WhatsApp template variables
 export type TemplateVariables = Record<string, string>
@@ -59,6 +83,51 @@ export const TEMPLATE_COSTS: Record<WhatsAppTemplate, number> = {
 
 // SMS cost (fallback)
 export const SMS_COST_CENTS = 5 // €0.05 per SMS
+
+/**
+ * Template message content (French)
+ *
+ * IMPORTANT: Keep in sync with:
+ * - src/lib/messaging/providers/twilio.ts (renderTemplate)
+ * - supabase/functions/send-message/index.ts (templates object)
+ *
+ * These are used for session messages (within 24h window).
+ * For template messages outside the session window, Meta-approved
+ * templates via Content SID are required.
+ */
+export const TEMPLATE_MESSAGES: Record<WhatsAppTemplate, string> = {
+  otp_verification: 'Votre code de vérification Loyeo : {{1}}',
+  welcome: 'Bienvenue chez {{1}} ! Vous avez gagné votre premier tampon.',
+  visit_confirmation: 'Tampon enregistré ! {{1}}/{{2}} tampons',
+  reward_earned: 'Bravo ! Vous avez gagné : {{1}}',
+  reward_redeemed: 'Récompense utilisée : {{1}}',
+  marketing: '{{1}}',
+}
+
+/**
+ * Render a template message with variables
+ *
+ * @param template - Template name
+ * @param variables - Variables to substitute (keys: '1', '2', etc.)
+ * @returns Rendered message string
+ */
+export function renderTemplateMessage(
+  template: WhatsAppTemplate,
+  variables: Record<string, string>
+): string {
+  let message = TEMPLATE_MESSAGES[template]
+  if (!message) {
+    console.error('[Messaging] Unknown template:', template)
+    return ''
+  }
+
+  // Replace {{1}}, {{2}}, etc. with actual values
+  Object.entries(variables).forEach(([key, value]) => {
+    message = message.replace(`{{${key}}}`, value)
+  })
+
+  return message
+}
 
 // OTP request
 export interface OTPRequest {
@@ -174,4 +243,32 @@ export function normalizePhone(phone: string): string {
   }
 
   return normalized
+}
+
+/**
+ * Parse and validate a phone number, returning a branded E164 type
+ *
+ * @param input - Raw phone number string
+ * @returns E164PhoneNumber if valid, null otherwise
+ *
+ * @example
+ * const phone = parseE164Phone('06 12 34 56 78')
+ * if (phone) {
+ *   // phone is now typed as E164PhoneNumber
+ *   await sendOTP({ phone, code: '123456' })
+ * }
+ */
+export function parseE164Phone(input: string): E164PhoneNumber | null {
+  const normalized = normalizePhone(input)
+  if (isValidFrenchPhone(normalized)) {
+    return normalized as E164PhoneNumber
+  }
+  return null
+}
+
+/**
+ * Type guard to check if a string is a valid E164 phone number
+ */
+export function isE164Phone(phone: string): phone is E164PhoneNumber {
+  return isValidFrenchPhone(normalizePhone(phone))
 }

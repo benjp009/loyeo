@@ -267,6 +267,7 @@ async function sendTemplate(request: TemplateRequest): Promise<SendResult> {
   }
 
   // For session messages, send direct body
+  // IMPORTANT: Keep in sync with src/lib/messaging/types.ts (TEMPLATE_MESSAGES)
   if (request.isSessionMessage) {
     const templates: Record<string, string> = {
       visit_confirmation: `Tampon enregistré ! ${request.variables['1'] || ''}/${request.variables['2'] || ''} tampons`,

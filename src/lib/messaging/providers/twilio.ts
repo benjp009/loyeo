@@ -17,9 +17,15 @@ import type {
   SMSRequest,
   DeliveryStatusWebhook,
   MessageStatus,
+  SuccessStatus,
   WhatsAppTemplate,
 } from '../types'
-import { TEMPLATE_COSTS, SMS_COST_CENTS, isValidFrenchPhone } from '../types'
+import {
+  TEMPLATE_COSTS,
+  SMS_COST_CENTS,
+  isValidFrenchPhone,
+  renderTemplateMessage,
+} from '../types'
 
 // Twilio SDK types (loaded dynamically)
 type TwilioClient = {
@@ -64,6 +70,18 @@ function mapTwilioStatus(status: string): MessageStatus {
     read: 'read',
     failed: 'failed',
     undelivered: 'undelivered',
+  }
+  return statusMap[status] || 'queued'
+}
+
+// Map Twilio status to success status (for successful sends)
+function mapToSuccessStatus(status: string): SuccessStatus {
+  const statusMap: Record<string, SuccessStatus> = {
+    queued: 'queued',
+    sending: 'queued',
+    sent: 'sent',
+    delivered: 'delivered',
+    read: 'read',
   }
   return statusMap[status] || 'queued'
 }
@@ -181,7 +199,7 @@ export class TwilioProvider implements MessagingProvider {
         success: true,
         messageId: message.sid,
         channel: 'whatsapp',
-        status: mapTwilioStatus(message.status),
+        status: mapToSuccessStatus(message.status),
         estimatedCostCents: TEMPLATE_COSTS.otp_verification,
       }
     } catch (error) {
@@ -204,7 +222,7 @@ export class TwilioProvider implements MessagingProvider {
         success: true,
         messageId: message.sid,
         channel: 'sms',
-        status: mapTwilioStatus(message.status),
+        status: mapToSuccessStatus(message.status),
         estimatedCostCents: SMS_COST_CENTS,
       }
     } catch (error) {
@@ -266,7 +284,7 @@ export class TwilioProvider implements MessagingProvider {
         success: true,
         messageId: message.sid,
         channel: 'whatsapp',
-        status: mapTwilioStatus(message.status),
+        status: mapToSuccessStatus(message.status),
         estimatedCostCents: TEMPLATE_COSTS[template],
       }
     } catch (error) {
@@ -292,7 +310,7 @@ export class TwilioProvider implements MessagingProvider {
         success: true,
         messageId: message.sid,
         channel: 'whatsapp',
-        status: mapTwilioStatus(message.status),
+        status: mapToSuccessStatus(message.status),
         estimatedCostCents: 0, // Session messages are free
       }
     } catch (error) {
@@ -330,7 +348,7 @@ export class TwilioProvider implements MessagingProvider {
         success: true,
         messageId: result.sid,
         channel: 'sms',
-        status: mapTwilioStatus(result.status),
+        status: mapToSuccessStatus(result.status),
         estimatedCostCents: SMS_COST_CENTS,
       }
     } catch (error) {
@@ -408,25 +426,13 @@ export class TwilioProvider implements MessagingProvider {
 
   /**
    * Render template message (for session messages)
+   * Uses shared template definitions from types.ts
    */
   private renderTemplate(
     template: WhatsAppTemplate,
     variables: Record<string, string>
   ): string {
-    const templates: Record<WhatsAppTemplate, string> = {
-      otp_verification: `Votre code de vérification Loyeo: ${variables['1'] || ''}`,
-      welcome: `Bienvenue chez ${variables['1'] || ''} ! Vous avez gagné votre premier tampon.`,
-      visit_confirmation: `Tampon enregistré ! ${variables['1'] || ''}/${variables['2'] || ''} tampons`,
-      reward_earned: `Bravo ! Vous avez gagné : ${variables['1'] || ''}`,
-      reward_redeemed: `Récompense utilisée : ${variables['1'] || ''}`,
-      marketing: variables['1'] || '',
-    }
-
-    const rendered = templates[template]
-    if (!rendered && template !== 'marketing') {
-      console.error('[Twilio] Unknown template requested:', template)
-    }
-    return rendered || ''
+    return renderTemplateMessage(template, variables)
   }
 
   /**
