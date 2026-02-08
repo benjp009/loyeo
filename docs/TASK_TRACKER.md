@@ -1,8 +1,8 @@
 # Loyeo — Task Tracker
 
-> **Last synced from ClickUp:** 2026-02-06
-> **Current phase:** Phase 0 — Foundation & Branding (finishing up)
-> **Next phase:** Phase 1 — MVP Build
+> **Last synced from ClickUp:** 2026-02-08
+> **Current phase:** Phase 1 — MVP Build
+> **Next phase:** Phase 2 — Consumer Portal & Polish
 
 ## 🔴 Active Sprint — Phase 0 Remaining Tasks
 
@@ -18,12 +18,12 @@
 ## ⬜ Next Up — Phase 1 Tasks (Weeks 3-6)
 
 ### Landing Page
-| ID | Task | Depends On |
-|----|------|-----------|
-| LP-001 | Design landing page wireframe | BR-002 ✅ |
-| LP-002 | Build landing page (Next.js) | LP-001, TS-003 |
-| LP-003 | Implement merchant signup flow | LP-002, TS-002 |
-| LP-004 | SEO & meta tags setup | LP-002 |
+| ID | Task | Depends On | Status |
+|----|------|-----------|--------|
+| LP-001 | Design landing page wireframe | BR-002 ✅ | DONE ✅ |
+| LP-002 | Build landing page (Next.js) | LP-001 ✅, TS-003 ✅ | DONE ✅ |
+| LP-003 | Implement merchant signup flow | LP-002 ✅, TS-002 ✅ | TO DO |
+| LP-004 | SEO & meta tags setup | LP-002 ✅ | TO DO |
 
 ### Merchant Dashboard
 | ID | Task | Depends On |
@@ -72,6 +72,11 @@
 - [TS-003] Setup Vercel deployment (cdg1 region, loyeo.fr, preview deploys) ✅
 - [TS-004] Setup WhatsApp Business API + SMS fallback (Twilio, abstraction layer, Edge Functions) ✅
 - [TS-005] Design & implement database schema (6 core tables, RLS, indexes, TypeScript types) ✅
+
+## ✅ Completed (Phase 1)
+
+- [LP-001] Design landing page wireframe ✅ — Council debate (5 members, 3 rounds), 5-section mobile-first structure
+- [LP-002] Build landing page (Next.js) ✅ — HeroSection, HowItWorksSection, PricingSection, SocialProofSection, FooterCTASection. PR #5.
 
 ---
 
