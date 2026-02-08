@@ -1,0 +1,5 @@
+export { HeroSection } from './HeroSection'
+export { HowItWorksSection } from './HowItWorksSection'
+export { PricingSection } from './PricingSection'
+export { SocialProofSection } from './SocialProofSection'
+export { FooterCTASection } from './FooterCTASection'
